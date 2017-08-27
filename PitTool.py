@@ -34,7 +34,7 @@ Options :
 
 
 def main():
-    global KEYSIZE, KEYLSB, VERBOSE
+    global KEYSIZE, KEYLSB, VERBOSE, CHANNEL_SELECTION
     try:
         options, arguments = getopt.getopt(sys.argv[1:], 'hvk:kl:l:f:',
                                            ['help', 'verbose', 'keysize=', 'keylsb=', 'lsb=', "format="])
@@ -65,7 +65,19 @@ def main():
         print USAGE
 
     if arguments:
+        CHANNEL_SELECTION = "012"
         print handle_image(arguments[0])
+        CHANNEL_SELECTION = "021"
+        print handle_image(arguments[0])
+        CHANNEL_SELECTION = "102"
+        print handle_image(arguments[0])
+        CHANNEL_SELECTION = "120"
+        print handle_image(arguments[0])
+        CHANNEL_SELECTION = "210"
+        print handle_image(arguments[0])
+        CHANNEL_SELECTION = "201"
+        print handle_image(arguments[0])
+        quit()
 
 
 def handle_image(parameters):
@@ -73,7 +85,6 @@ def handle_image(parameters):
     matrix = numpy.array(img)
     pit_key_size(matrix);
     get_informations(matrix, RMS, LSB, FORMAT)
-    quit()
 
 
 def pit_key_size(matrix):
@@ -89,8 +100,7 @@ def pit_key_size(matrix):
         INDICATOR = 2
     PARITY = get_parity(int(rms))
     RMS = int(rms)
-    CHANNEL_SELECTION = get_channel_selection_criteria()
-    CHANNEL_SELECTION = "210"
+    # CHANNEL_SELECTION = get_channel_selection_criteria()
 
 def get_parity(v):
     v ^= v >> 16
@@ -117,11 +127,11 @@ def is_prime(num):
 
 def int_to_lsb(pixel, number_of_lsb):
     """return the lsb of a pixel"""
-    lsb = 8 - number_of_lsb
+    lsb = 7 - number_of_lsb
     red = '{0:08b}'.format(pixel[0])
     green = '{0:08b}'.format(pixel[1])
     blue = '{0:08b}'.format(pixel[2])
-    return red[lsb:8] + green[lsb:8] + blue[lsb:8]
+    return str(red[lsb:7]) + str(green[lsb:7]) + str(blue[lsb:7])
 
 
 def get_informations(matrix, key_length, LSB, FORMAT):
@@ -129,16 +139,30 @@ def get_informations(matrix, key_length, LSB, FORMAT):
         for ncolumn, column in enumerate(row):
             # remove the lsb used for calculate the keysize
             if not nrow == 0 or not (ncolumn <= KEYSIZE):
-                get_bits_from_pixel(column)
+                b = get_bits_from_pixel(column)
+                if b:
+                    return
 
 
 def get_bits_from_pixel(pixel):
     bits_useful = int_to_lsb(pixel, LSB)
     get_information_from_bits(bits_useful)
     if is_key_size_reached(bits_useful):
-        n = int(INFO, 2)
-        print binascii.unhexlify('%x' % n)
-        quit()
+        try:
+            n = int(INFO, 2)
+            if n%8 != 0:
+                s= str(n)
+                padding = n%8
+                for i in range(padding):
+                    s += "0"
+                n = int(s)
+            test = n%8
+            try:
+                print binascii.unhexlify('%x' % n)
+            except:
+                return True
+        except:
+            return True
 
 
 def is_key_size_reached(bits_useful):
@@ -159,17 +183,22 @@ def get_information_from_bits(pixel):
     global INFO,RIGHT
     a = []
     b = []
-    c = []
     for chunk in chunks(pixel, 2):
         a.append(chunk)
     for chunk in chunks(CHANNEL_SELECTION, 1):
         b.append(chunk)
 
     if RIGHT != 0 :
-        c = b[:]
-        b[0] = c[2]
-        b[1] = c[0]
-        b[2] = c[1]
+        if RIGHT == False:
+            c = b[:]
+            b[0] = c[2]
+            b[1] = c[0]
+            b[2] = c[1]
+        else:
+            c = b[:]
+            b[0] = c[0]
+            b[1] = c[1]
+            b[2] = c[2]
     if(int(b[0]) == 0):
         if (int(b[1]) == 1):
             INFO += get_hidden_date(a, b[0])
@@ -200,7 +229,7 @@ def get_hidden_date(channels,indicator_channel):
         a,b = 2,1
     else:
         a,b = 0,1
-
+    ret = ""
     if indicator == "00":
         ret = ""
     elif indicator == "01":
